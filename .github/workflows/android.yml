@@ -1,0 +1,46 @@
+name: Build APK & Send to Telegram
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    # دانلود قالب آماده اندروید (چون مخزن شما خالی است)
+    - name: Setup Android Template
+      run: |
+        if [ ! -f "gradlew" ]; then
+          git clone https://github.com/android/architecture-samples.git temp_repo
+          cp -r temp_repo/* .
+          rm -rf temp_repo
+        fi
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build APK
+      run: ./gradlew assembleDebug
+
+    - name: Send APK to Telegram
+      if: always()
+      run: |
+        APK_PATH=$(find . -name "*.apk" | head -n 1)
+        if [ -f "$APK_PATH" ]; then
+          curl -v -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+               -F "caption=🎮 رئیس، فایل APK تستی آماده شد! (هنوز بازی اصلی نیست)" \
+               -F "document=@$APK_PATH" \
+               https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendDocument
+        fi
